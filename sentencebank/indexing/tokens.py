@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 
 @dataclass(kw_only=True)
-class Token:
-    text:     str
+class IndexingToken:
+    value:    str
     position: int
     start:    int
     end:      int

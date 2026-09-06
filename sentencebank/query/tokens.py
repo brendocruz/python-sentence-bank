@@ -10,7 +10,7 @@ class QueryTokenKind(Enum):
     PRECEDES    = auto() # `<<`.
     ANGLE_OPEN  = auto() # `<`.
     ANGLE_CLOSE = auto() # `>`.
-    COMMA       = auto() # `,`.
+    COLON       = auto() # `:`.
 
     AND         = auto() # `&`.
     OR          = auto() # `|`.
