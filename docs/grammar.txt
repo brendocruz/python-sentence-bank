@@ -1,0 +1,31 @@
+imp-and-expr    ::= or-expr, { or-expr } ;
+or-expr         ::= exp-and-expr, { or-op, exp-and-expr } ;
+exp-and-expr    ::= positional-expr, { and-op, positional-expr } ;
+positional-expr ::= not-expr, { positional-op, not-expr }; 
+
+not-expr        ::= [ not-op ], exact-expr ;
+exact-expr      ::= [ exact-op ], anchored-expr ;
+anchored-expr   ::= '^', primary-expr
+                  | primary-expr, '$'
+                  | primary-expr ;
+
+primary-expr    ::= term | phrase | nested-expr ;
+nested-expr     ::= '(', imp-and-expr ')' ;
+phrase          ::= '"', term, { term }, '"' ;
+
+term            ::= ( alphabet | wildcard ), { alphabet | wildcard } ;
+wildcard        ::= '*' | '?' ;
+number          ::= digit, { digit } ;
+
+positional-op   ::= precedence-op | near-op ;
+precedence-op   ::= '<<' ;
+near-op         ::= '<', near-range, '>' ;
+near-range      ::= number, ':', number
+                  | number, ':'
+                  | ':', number
+                  | number ;
+
+and-op          ::= '&' ;
+or-op           ::= '|' ;
+not-op          ::= '~' ;
+exact-op        ::= '=' ;
