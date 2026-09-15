@@ -1,12 +1,15 @@
+from typing import TypedDict
+from sentencebank.indexing.types import TermID, DocID
 from dataclasses import dataclass
 from enum import IntEnum
-
-type TermID = int
-type DocID  = int
 
 type PostingEntry = list[int]
 type PostingList  = list[PostingEntry]
 type PostingMap   = dict[TermID, PostingList]
+
+
+class IndexData(TypedDict):
+    entries: PostingMap
 
 
 class _EntryAttribute(IntEnum):
@@ -25,19 +28,19 @@ class Posting:
 
 
 class InvertedIndex:
-    _entries: PostingMap
+    _data: IndexData
 
-    def __init__(self, index: PostingMap | None = None) -> None:
-        self._entries = index or {}
+    def __init__(self) -> None:
+        self._data = {'entries': {}}
 
     def term_count(self) -> int:
-        return len(self._entries)
+        return len(self._data['entries'])
 
     def clear(self) -> None:
-        self._entries.clear()
+        self._data['entries'].clear()
 
     def get_posting(self, term_id: TermID, doc_id: DocID, position: int) -> Posting | None:
-        posting_list = self._entries.get(term_id, None)
+        posting_list = self._data['entries'].get(term_id, None)
         if posting_list is None:
             return None
 
@@ -54,7 +57,7 @@ class InvertedIndex:
         return None
 
     def get_postings(self, term_id: TermID) -> list[Posting]:
-        posting_list = self._entries.get(term_id, None)
+        posting_list = self._data['entries'].get(term_id, None)
         if posting_list is None:
             return []
 
@@ -68,12 +71,12 @@ class InvertedIndex:
         return postings
 
     def remove_posting(self, term_id: TermID, doc_id: DocID, position: int) -> None:
-        posting_list = self._entries.get(term_id, None)
+        posting_list = self._data['entries'].get(term_id, None)
         if posting_list is None:
             return
 
         if len(posting_list) == 1:
-            self._entries.pop(term_id)
+            self._data['entries'].pop(term_id)
             return
 
         for posting_entry in posting_list:
@@ -85,10 +88,10 @@ class InvertedIndex:
             break
 
     def add_posting(self, term_id: TermID, posting: Posting) -> None:
-        posting_list = self._entries.get(term_id, None)
+        posting_list = self._data['entries'].get(term_id, None)
         if posting_list is None:
             posting_list = []
-            self._entries[term_id] = posting_list
+            self._data['entries'][term_id] = posting_list
 
         for posting_entry in posting_list:
             if posting_entry[_EntryAttribute.DOCUMENT_ID] != posting.doc_id:
@@ -100,7 +103,7 @@ class InvertedIndex:
         posting_list.append(posting_entry)
 
     def contains_posting(self, term_id: TermID, doc_id: DocID, position: int) -> bool:
-        posting_list = self._entries.get(term_id, None)
+        posting_list = self._data['entries'].get(term_id, None)
         if posting_list is None:
             return False
 
@@ -113,4 +116,4 @@ class InvertedIndex:
         return False
 
     def contains_term(self, term_id: TermID) -> bool:
-        return term_id in self._entries
+        return term_id in self._data['entries']

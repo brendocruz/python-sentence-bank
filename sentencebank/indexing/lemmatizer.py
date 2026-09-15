@@ -1,55 +1,61 @@
-type VariationMap = dict[str, str]
-type LemmaMap     = dict[str, list[str]]
+from typing import TypedDict
+from sentencebank.indexing.types import TermID
+
+type VariationMap = dict[TermID, TermID]
+type LemmaMap     = dict[TermID, list[TermID]]
+
+
+class LemmatizerData(TypedDict):
+    variations: VariationMap
+    lemmas:     LemmaMap
+
 
 class Lemmatizer:
-    _variations: VariationMap
-    _lemmas:     LemmaMap
+    _data: LemmatizerData
 
-    def __init__(self, variations: VariationMap | None = None,
-                 lemmas: LemmaMap | None = None) -> None:
-        self._variations =  variations or {}
-        self._lemmas     = lemmas or {}
+    def __init__(self) -> None:
+        self._data = {'variations': {}, 'lemmas': {}}
     
     def variation_count(self) -> int:
-        return len(self._variations)
+        return len(self._data['variations'])
     
     def lemma_count(self) -> int:
-        return len(self._lemmas)
+        return len(self._data['lemmas'])
 
     def clear(self) -> None:
-        self._variations = {}
-        self._lemmas     = {}
+        self._data['variations'] = {}
+        self._data['lemmas']     = {}
     
-    def remove_variation(self, variation) -> None:
-        lemma = self._variations.pop(variation, None)
+    def remove_variation(self, variation_id: TermID) -> None:
+        lemma = self._data['variations'].pop(variation_id, None)
         if lemma is None:
             return
 
-        lemma_entry = self._lemmas[lemma]
-        lemma_entry.remove(variation)
+        lemma_entry = self._data['lemmas'][lemma]
+        lemma_entry.remove(variation_id)
         if len(lemma_entry) == 0:
-            self._lemmas.pop(lemma)
+            self._data['lemmas'].pop(lemma)
 
-    def set_variation(self, variation: str, lemma: str) -> None:
-        if variation in self._variations:
-            self.remove_variation(variation)
+    def set_variation(self, variation_id: TermID, lemma_id: TermID) -> None:
+        if variation_id in self._data['variations']:
+            self.remove_variation(variation_id)
 
-        self._variations[variation] = lemma
+        self._data['variations'][variation_id] = lemma_id
 
-        lemma_entry = self._lemmas.get(lemma, None)
+        lemma_entry = self._data['lemmas'].get(lemma_id, None)
         if lemma_entry is None:
-            self._lemmas[lemma] = [variation]
+            self._data['lemmas'][lemma_id] = [variation_id]
             return
-        lemma_entry.append(variation)
+        lemma_entry.append(variation_id)
 
-    def lemmatize(self, variation: str) -> str:
-        return self._variations.get(variation, '')
+    def lemmatize(self, variation_id: TermID) -> TermID | None:
+        return self._data['variations'].get(variation_id, None)
 
-    def get_variations(self, lemma: str) -> list[str]:
-        return self._lemmas.get(lemma, [])
+    def get_variations(self, lemma_id: TermID) -> list[TermID]:
+        return self._data['lemmas'].get(lemma_id, [])
 
-    def contains_variation(self, variation: str) -> bool:
-        return variation in self._variations
+    def contains_variation(self, variation_id: TermID) -> bool:
+        return variation_id in self._data['variations']
 
-    def contains_lemma(self, lemma: str) -> bool:
-        return lemma in self._lemmas
+    def contains_lemma(self, lemma_id: TermID) -> bool:
+        return lemma_id in self._data['lemmas']
