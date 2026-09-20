@@ -1,31 +1,39 @@
 from sentencebank.indexing.types import DocID
-from typing import TypedDict
-
-type SentenceMap = dict[DocID, str]
-
-
-class DocumentStoreData(TypedDict):
-    entries: SentenceMap
-    next_id: int
+from sqlite3 import Connection
 
 
 class DocumentStore:
-    _data: DocumentStoreData
+    _conn: Connection
 
-    def __init__(self):
-        self._data = {'entries': {}, 'next_id': 1}
+    def __init__(self, connection: Connection) -> None:
+        self._conn = connection
 
-    def add_sentence(self, sentence: str) -> DocID:
-        doc_id = self._data['next_id']
-        self._data['entries'][doc_id] = sentence
-        self._data['next_id'] = doc_id + 1
-        return doc_id
+    def add_document(self, text: str) -> DocID:
+        cursor = self._conn.execute(
+                'INSERT INTO documents (text) VALUES (?)',
+                (text,))
+        assert cursor.lastrowid
+        return cursor.lastrowid
 
-    def remove_sentence(self, doc_id: DocID) -> bool:
-        return self._data['entries'].pop(doc_id, None) is not None
+    def remove_document(self, doc_id: DocID) -> bool:
+        cursor = self._conn.execute(
+                'DELETE FROM documents WHERE doc_id = ?',
+                (doc_id,))
+        return cursor.rowcount > 0
 
-    def get_sentence(self, doc_id: DocID) -> str | None:
-        return self._data['entries'].get(doc_id, None);
+    def get_document(self, doc_id: DocID) -> str | None:
+        cursor = self._conn.execute(
+                'SELECT text FROM documents WHERE doc_id = ?',
+                (doc_id,))
+        row    = cursor.fetchone()
+
+        if row is None:
+            return None
+        return row[0] 
 
     def size(self) -> int:
-        return len(self._data['entries'])
+        cursor = self._conn.execute('SELECT COUNT(*) FROM documents')
+        row    = cursor.fetchone()
+
+        assert row is not None
+        return row[0]

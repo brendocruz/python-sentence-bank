@@ -1,203 +1,286 @@
+from sentencebank.db.database import init_db
 from sentencebank.indexing.lexicon import Lexicon
+from sqlite3 import IntegrityError, connect
+from pytest import fixture, raises
 
 
 class TestLexicon:
+    lexicon: Lexicon
+
+    @fixture(autouse=True)
+    def setup(self):
+        conn = connect(':memory:')
+
+        init_db(conn)
+        self.lexicon = Lexicon(conn)
+
+        yield
+
+        conn.close()
 
     def test_contains_true(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('hello', 1, 1)
+        term_id = self.lexicon.add_term('hello')
+        self.lexicon.increment_doc_freq(term_id, 1)
+        self.lexicon.increment_col_freq(term_id, 2)
 
-        assert lexicon.contains('hello') == True
+        assert self.lexicon.contains('hello') == True
 
     def test_contains_false(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('hello', 1, 1)
+        term_id = self.lexicon.add_term('hello')
+        self.lexicon.increment_doc_freq(term_id, 1)
+        self.lexicon.increment_col_freq(term_id, 2)
 
-        assert lexicon.contains('world') == False
+        assert self.lexicon.contains('world') == False
 
     def test_get_term_present_id(self):
-        lexicon = Lexicon()
-        term_id = lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_term(term_id) == 'language'
+        assert self.lexicon.get_term(term_id) == 'language'
 
     def test_get_term_absent_id(self):
-        lexicon = Lexicon()
-        term_id = lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
         absent_term_id = term_id + 1
-        assert lexicon.get_term(absent_term_id) is None
+        assert self.lexicon.get_term(absent_term_id) is None
+
+    def test_get_term_invalid_id(self):
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
+
+        assert self.lexicon.get_term(-1) is None
 
     def test_get_term_id_present_term(self):
-        lexicon = Lexicon()
-        term_id = lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_term_id('language') == term_id
+        assert self.lexicon.get_term_id('language') == term_id
 
     def test_get_term_id_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_term_id('learning') is None
+        assert self.lexicon.get_term_id('learning') is None
+
+    def test_get_term_id_empty_string(self):
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
+
+        assert self.lexicon.get_term_id('') is None
 
     def test_get_doc_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_doc_freq('language') == 6
+        assert self.lexicon.get_doc_freq(term_id) == 6
 
     def test_get_doc_freq_present_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_doc_freq('learning') == 0
+        assert self.lexicon.get_doc_freq(term_id) == 6
 
     def test_get_col_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_col_freq('language') == 7
+        assert self.lexicon.get_col_freq(term_id) == 7
 
     def test_get_col_freq_present_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('language', 6, 7)
+        term_id = self.lexicon.add_term('language')
+        self.lexicon.increment_doc_freq(term_id, 6)
+        self.lexicon.increment_col_freq(term_id, 7)
 
-        assert lexicon.get_col_freq('learning') == 0
+        assert self.lexicon.get_col_freq(term_id) == 7
 
-    def test_get_terms(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('cat',  6, 7)
-        lexicon.set_entry('dog',  1, 1)
-        lexicon.set_entry('bird', 1, 3)
+    def test_get_all_terms_non_empty_lexicon(self):
+        self.lexicon.add_term('cat')
+        self.lexicon.add_term('dog')
+        self.lexicon.add_term('bird')
 
-        terms = lexicon.get_terms()
+        terms = self.lexicon.get_all_terms()
 
         assert len(terms) == 3
         assert 'cat'  in terms
         assert 'dog'  in terms
         assert 'bird' in terms
 
-    def test_size_empty(self):
-        lexicon = Lexicon()
+    def test_get_all_terms_empty_lexicon(self):
+        terms = self.lexicon.get_all_terms()
 
-        assert lexicon.size() == 0
+        assert len(terms) == 0
 
-    def test_size_non_empty(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('hello', 1, 1)
-        lexicon.set_entry('word',  1, 2)
+    def test_get_all_protected_terms_non_empty_lexicon(self):
+        self.lexicon.add_term('\'bout',    is_protected=True)
+        self.lexicon.add_term('friends\'', is_protected=True)
+        self.lexicon.add_term('\'cause',   is_protected=True)
 
-        assert lexicon.size() == 2
+        terms = self.lexicon.get_all_protected_terms()
 
-    def test_clear(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('cat',  6, 7)
-        lexicon.set_entry('dog',  1, 1)
-        lexicon.set_entry('bird', 1, 3)
+        assert len(terms) == 3
+        assert '\'bout'    in terms
+        assert 'friends\'' in terms
+        assert '\'cause'   in terms
 
-        lexicon.clear()
-        
-        assert lexicon.size()                 == 0
-        assert lexicon.set_entry('cat', 1, 1) == 1
+    def test_get_all_protected_terms_empty_lexicon(self):
+        terms = self.lexicon.get_all_protected_terms()
 
-    def test_set_entry_absent_term(self):
-        lexicon = Lexicon()
+        assert len(terms) == 0
 
-        assert lexicon.set_entry('dog', 1, 3) == 1
+    def test_size_empty_lexicon(self):
+        assert self.lexicon.size() == 0
 
-        assert lexicon.contains('dog')        == True
-        assert lexicon.get_term(1)            == 'dog'
-        assert lexicon.get_term_id('dog')     == 1
-        assert lexicon.get_doc_freq('dog')    == 1
-        assert lexicon.get_col_freq('dog')    == 3
+    def test_size_non_empty_lexicon(self):
+        self.lexicon.add_term('hello')
+        self.lexicon.add_term('word')
 
-    def test_set_entry_present_term(self):
-        lexicon = Lexicon()
+        assert self.lexicon.size() == 2
 
-        assert lexicon.set_entry('cat', 20, 26) == 1
-        assert lexicon.set_entry('cat', 32, 40) == 1
+    def test_add_term_absent_term(self):
+        term_id = self.lexicon.add_term('bird')
 
-        assert lexicon.contains('cat')     == True
-        assert lexicon.get_term(1)         == 'cat'
-        assert lexicon.get_doc_freq('cat') == 32
-        assert lexicon.get_col_freq('cat') == 40
+        assert self.lexicon.contains('bird')      == True
+        assert self.lexicon.get_term(term_id)     == 'bird'
+        assert self.lexicon.get_term_id('bird')   == term_id
+        assert self.lexicon.get_doc_freq(term_id) == 0
+        assert self.lexicon.get_col_freq(term_id) == 0
+
+    def test_add_term_present_term_raises_error(self):
+        self.lexicon.add_term('bird')
+
+        with raises(IntegrityError):
+            self.lexicon.add_term('bird')
+
+    def test_add_term_absent_protected_term(self):
+        term    = '\'bout'
+        term_id = self.lexicon.add_term(term, True)
+
+        assert self.lexicon.contains(term)             == True
+        assert self.lexicon.get_term(term_id)          == term
+        assert self.lexicon.get_term_id(term)          == term_id
+        assert self.lexicon.get_doc_freq(term_id)      == 0
+        assert self.lexicon.get_col_freq(term_id)      == 0
+        assert self.lexicon.is_protected_term(term_id) == True
 
     def test_increment_doc_freq_present_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('bird', 2, 6)
+        term_id = self.lexicon.add_term('bird')
+        self.lexicon.increment_doc_freq(term_id, 2)
+        self.lexicon.increment_col_freq(term_id, 6)
 
-        lexicon.increment_doc_freq('bird')
+        self.lexicon.increment_doc_freq(term_id, 3)
 
-        assert lexicon.get_doc_freq('bird') == 3
+        assert self.lexicon.get_doc_freq(term_id) == 5
 
     def test_increment_doc_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('bird', 2, 6)
+        term_id = self.lexicon.add_term('bird')
+        self.lexicon.increment_doc_freq(term_id, 2)
+        self.lexicon.increment_col_freq(term_id, 6)
 
-        lexicon.increment_doc_freq('home')
+        absent_term_id = term_id + 1
+        self.lexicon.increment_doc_freq(absent_term_id, 3)
 
-        assert lexicon.get_doc_freq('home') == 1
+        assert self.lexicon.get_doc_freq(absent_term_id) == 0
 
     def test_decrement_doc_freq_present_term_and_greater_than_zero(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('bird', 2, 6)
+        term_id = self.lexicon.add_term('bird')
+        self.lexicon.increment_doc_freq(term_id, 2)
+        self.lexicon.increment_col_freq(term_id, 6)
 
-        lexicon.decrement_doc_freq('bird')
+        self.lexicon.decrement_doc_freq(term_id, 1)
 
-        assert lexicon.get_doc_freq('bird') == 1
+        assert self.lexicon.get_doc_freq(term_id) == 1
 
     def test_decrement_doc_freq_present_term_and_equal_zero(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('bird', 0, 0)
+        term_id = self.lexicon.add_term('bird')
+        self.lexicon.increment_doc_freq(term_id, 0)
+        self.lexicon.increment_col_freq(term_id, 0)
 
-        lexicon.decrement_doc_freq('bird')
+        self.lexicon.decrement_doc_freq(term_id, 3)
 
-        assert lexicon.get_doc_freq('bird') == 0
+        assert self.lexicon.get_doc_freq(term_id) == 0
 
     def test_decrement_doc_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('bird', 2, 6)
+        term_id = self.lexicon.add_term('bird')
+        self.lexicon.increment_doc_freq(term_id, 2)
+        self.lexicon.increment_col_freq(term_id, 6)
 
-        lexicon.decrement_doc_freq('home')
+        absent_term_id = term_id + 1
+        self.lexicon.decrement_doc_freq(absent_term_id, 3)
 
-        assert lexicon.get_doc_freq('home') == 0
+        assert self.lexicon.get_doc_freq(absent_term_id) == 0
 
     def test_increment_col_freq_present_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('horse', 3, 5)
+        term_id = self.lexicon.add_term('horse')
+        self.lexicon.increment_doc_freq(term_id, 3)
+        self.lexicon.increment_col_freq(term_id, 5)
 
-        lexicon.increment_col_freq('horse')
+        self.lexicon.increment_col_freq(term_id, 3)
 
-        assert lexicon.get_col_freq('horse') == 6
+        assert self.lexicon.get_col_freq(term_id) == 8
 
     def test_increment_col_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('horse', 3, 5)
+        term_id = self.lexicon.add_term('horse')
+        self.lexicon.increment_doc_freq(term_id, 3)
+        self.lexicon.increment_col_freq(term_id, 5)
 
-        lexicon.increment_col_freq('chair')
+        absent_term_id = term_id + 1
+        self.lexicon.increment_col_freq(term_id, 3)
 
-        assert lexicon.get_col_freq('chair') == 1
+        assert self.lexicon.get_col_freq(absent_term_id) == 0
 
     def test_decrement_col_freq_present_term_and_greater_than_zero(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('horse', 3, 5)
+        term_id = self.lexicon.add_term('horse')
+        self.lexicon.increment_doc_freq(term_id, 3)
+        self.lexicon.increment_col_freq(term_id, 5)
 
-        lexicon.decrement_col_freq('horse')
+        self.lexicon.decrement_col_freq(term_id, 3)
 
-        assert lexicon.get_col_freq('horse') == 4
+        assert self.lexicon.get_col_freq(term_id) == 2
 
     def test_decrement_col_freq_present_term_and_equal_zero(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('horse', 0, 0)
+        term_id = self.lexicon.add_term('horse')
+        self.lexicon.increment_doc_freq(term_id, 0)
+        self.lexicon.increment_col_freq(term_id, 0)
 
-        lexicon.decrement_col_freq('horse')
+        self.lexicon.decrement_col_freq(term_id, 1)
 
-        assert lexicon.get_col_freq('horse') == 0
+        assert self.lexicon.get_col_freq(term_id) == 0
 
     def test_decrement_col_freq_absent_term(self):
-        lexicon = Lexicon()
-        lexicon.set_entry('horse', 3, 5)
+        term_id = self.lexicon.add_term('horse')
+        self.lexicon.increment_doc_freq(term_id, 3)
+        self.lexicon.increment_col_freq(term_id, 5)
 
-        lexicon.decrement_col_freq('chair')
+        absent_term_id = term_id + 1
+        self.lexicon.decrement_col_freq(absent_term_id, 3)
 
-        assert lexicon.get_col_freq('chair') == 0
+        assert self.lexicon.get_col_freq(absent_term_id) == 0
+
+    def test_is_protected_term_present_term_true(self):
+        term_id = self.lexicon.add_term('\'cause', is_protected=True)
+
+        is_protected = self.lexicon.is_protected_term(term_id)
+        assert is_protected == True
+
+    def test_is_protected_term_present_term_false(self):
+        term_id = self.lexicon.add_term('dog', is_protected=False)
+
+        is_protected = self.lexicon.is_protected_term(term_id)
+        assert is_protected == False
+
+    def test_is_protected_term_absent_term(self):
+        term_id = self.lexicon.add_term('dog', is_protected=False)
+
+        absent_term_id = term_id + 1
+        is_protected = self.lexicon.is_protected_term(absent_term_id)
+        assert is_protected == False

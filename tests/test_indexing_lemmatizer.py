@@ -1,221 +1,168 @@
 from sentencebank.indexing.lemmatizer import Lemmatizer
+from sentencebank.db.database import init_db
+from sqlite3 import connect, IntegrityError
+from pytest import fixture, raises
 
 
 class TestLemmatizer:
+    lemmatizer: Lemmatizer
 
-    def test_count_zero(self):
-        lemmatizer = Lemmatizer()
+    TERMS = {'be':       1,
+             'was':      2,
+             'were':     3,
+             'been':     4,
+             'is':       5,
+             'are':      6,
+             'put':     10,
+             'puts':    11,
+             'putting': 12,
+             'set':     20,
+             'sets':    21,
+             'setting': 22,
+             'have':    30,
+             'has':     31,
+             'had':     32,
+             'where':   50,}
 
-        assert lemmatizer.variation_count() == 0
-        assert lemmatizer.lemma_count()     == 0
+    @fixture(autouse=True)
+    def setup(self):
+        conn = connect(':memory:')
 
-    def test_count_non_zero(self):
-        TERM_ID_PUT     = 20
-        TERM_ID_PUTS    = 21
-        TERM_ID_PUTTING = 22
+        init_db(conn)
+        self.lemmatizer = Lemmatizer(conn)
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_PUT,     TERM_ID_PUT)
-        lemmatizer.set_variation(TERM_ID_PUTS,    TERM_ID_PUT)
-        lemmatizer.set_variation(TERM_ID_PUTTING, TERM_ID_PUT)
+        lexicon_data = [(term_id, term) for term, term_id in self.TERMS.items()]
+        conn.executemany(
+                'INSERT INTO lexicon (term_id, term) VALUES (?, ?)',
+                lexicon_data)
 
-        assert lemmatizer.variation_count() == 3
-        assert lemmatizer.lemma_count()     == 1
+        yield
 
-    def test_clear(self):
-        TERM_ID_PUT     = 20
-        TERM_ID_PUTS    = 21
-        TERM_ID_PUTTING = 22
+        conn.close()
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_PUT,     TERM_ID_PUT)
-        lemmatizer.set_variation(TERM_ID_PUTS,    TERM_ID_PUT)
-        lemmatizer.set_variation(TERM_ID_PUTTING, TERM_ID_PUT)
+    def test_term_count_zero(self):
+        assert self.lemmatizer.term_count() == 0
 
-        lemmatizer.clear()
-        assert lemmatizer.variation_count() == 0
-        assert lemmatizer.lemma_count()     == 0
+    def test_term_count_non_zero(self):
+        self.lemmatizer.add_term(self.TERMS['put'],     self.TERMS['put'])
+        self.lemmatizer.add_term(self.TERMS['puts'],    self.TERMS['put'])
+        self.lemmatizer.add_term(self.TERMS['putting'], self.TERMS['put'])
 
-    def test_remove_variation_present_variation_retains_lemma(self):
-        TERM_ID_BE    = 10
-        TERM_ID_WERE  = 12
-        TERM_ID_WHERE = 90
+        assert self.lemmatizer.term_count() == 3
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WERE,  TERM_ID_BE)
-        lemmatizer.set_variation(TERM_ID_WHERE, TERM_ID_BE)
+    def test_lemma_count_zero(self):
+        assert self.lemmatizer.lemma_count() == 0
 
-        lemmatizer.remove_variation(TERM_ID_WHERE)
+    def test_lemma_count_non_zero(self):
+        self.lemmatizer.add_term(self.TERMS['put'],     self.TERMS['put'])
+        self.lemmatizer.add_term(self.TERMS['puts'],    self.TERMS['put'])
+        self.lemmatizer.add_term(self.TERMS['putting'], self.TERMS['put'])
 
-        assert lemmatizer.variation_count()       == 1
-        assert lemmatizer.lemma_count()           == 1
-        assert lemmatizer.lemmatize(TERM_ID_WERE) == TERM_ID_BE
+        assert self.lemmatizer.lemma_count() == 1
 
-        variations = lemmatizer.get_variations(TERM_ID_BE)
-        assert len(variations) == 1
-        assert TERM_ID_WERE    in variations
+    def test_add_term_absent_term(self):
+        self.lemmatizer.add_term(self.TERMS['was'], self.TERMS['be'])
 
-    def test_remove_variation_present_variation_cleans_lemma(self):
-        TERM_ID_BE   = 10
-        TERM_ID_WERE = 12
+        assert self.lemmatizer.term_count()  == 1
+        assert self.lemmatizer.lemma_count() == 1
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WERE,  TERM_ID_BE)
+        lemma_id = self.lemmatizer.lemmatize(self.TERMS['was'])
+        assert lemma_id == self.TERMS['be']
 
-        lemmatizer.remove_variation(TERM_ID_WERE)
+        term_ids = self.lemmatizer.get_terms(self.TERMS['be']) 
+        assert len(term_ids) == 1
 
-        assert lemmatizer.variation_count() == 0
-        assert lemmatizer.lemma_count()     == 0
+        assert self.TERMS['was'] in term_ids
 
-    def test_remove_variation_absent_variation(self):
-        TERM_ID_BE   = 10
-        TERM_ID_WERE = 12
-        TERM_ID_WHERE = 90
+    def test_add_term_present_term_reassigns_lemma_raises_error(self):
+        self.lemmatizer.add_term(self.TERMS['was'], self.TERMS['been'])
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WERE,  TERM_ID_BE)
+        with raises(IntegrityError):
+            self.lemmatizer.add_term(self.TERMS['was'], self.TERMS['be'])
 
-        lemmatizer.remove_variation(TERM_ID_WHERE)
+    def test_remove_term_present_term(self):
+        self.lemmatizer.add_term(self.TERMS['were'],  self.TERMS['be'])
+        self.lemmatizer.add_term(self.TERMS['where'], self.TERMS['be'])
 
-        assert lemmatizer.variation_count()       == 1
-        assert lemmatizer.lemma_count()           == 1
-        assert lemmatizer.lemmatize(TERM_ID_WERE) == TERM_ID_BE
+        self.lemmatizer.remove_term(self.TERMS['where'])
 
-        variations = lemmatizer.get_variations(TERM_ID_BE)
-        assert len(variations) == 1
-        assert TERM_ID_WERE    in variations
+        assert self.lemmatizer.term_count()  == 1
+        assert self.lemmatizer.lemma_count() == 1
 
-    def test_set_variation_absent_variation_creates_lemma(self):
-        TERM_ID_BE  = 10
-        TERM_ID_WAS = 11
+        lemma_id = self.lemmatizer.lemmatize(self.TERMS['where'])
+        assert lemma_id == self.TERMS['where']
+        lemma_id = self.lemmatizer.lemmatize(self.TERMS['were'])
+        assert lemma_id == self.TERMS['be']
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WAS, TERM_ID_BE)
+        term_ids = self.lemmatizer.get_terms(self.TERMS['be'])
+        assert len(term_ids) == 1
 
-        assert lemmatizer.variation_count()          == 1
-        assert lemmatizer.lemma_count()              == 1
-        assert lemmatizer.lemmatize(TERM_ID_WAS)     == TERM_ID_BE
+        assert self.TERMS['were'] in term_ids
 
-        variations = lemmatizer.get_variations(TERM_ID_BE) 
-        assert len(variations) == 1
-        assert TERM_ID_WAS     in variations
+    def test_remove_term_absent_term(self):
+        self.lemmatizer.add_term(self.TERMS['were'], self.TERMS['be'])
 
-    def test_set_variation_present_variation_reassigns_lemma(self):
-        TERM_ID_BE   = 10
-        TERM_ID_WAS  = 11
-        TERM_ID_BEEN = 13
+        has_removed = self.lemmatizer.remove_term(self.TERMS['where'])
+        assert has_removed == False
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WAS, TERM_ID_BEEN)
-        lemmatizer.set_variation(TERM_ID_WAS, TERM_ID_BE)
+        assert self.lemmatizer.term_count()  == 1
+        assert self.lemmatizer.lemma_count() == 1
 
-        assert lemmatizer.variation_count()    == 1
-        assert lemmatizer.lemma_count()        == 1
-        assert lemmatizer.lemmatize(TERM_ID_WAS)     == TERM_ID_BE
-        assert lemmatizer.get_variations(TERM_ID_BE) == [TERM_ID_WAS]
+        assert self.lemmatizer.lemmatize(self.TERMS['were']) == self.TERMS['be']
 
-    def test_set_variation_present_lemma_appends_variation(self):
-        TERM_ID_BE   = 10
-        TERM_ID_WAS  = 11
-        TERM_ID_WERE = 12
+        term_ids = self.lemmatizer.get_terms(self.TERMS['be'])
+        assert len(term_ids) == 1
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_WAS, TERM_ID_BE)
-        lemmatizer.set_variation(TERM_ID_WERE, TERM_ID_BE)
-
-        assert lemmatizer.variation_count()       == 2
-        assert lemmatizer.lemma_count()           == 1
-        assert lemmatizer.lemmatize(TERM_ID_WAS)  == TERM_ID_BE
-        assert lemmatizer.lemmatize(TERM_ID_WERE) == TERM_ID_BE
-
-        variations = lemmatizer.get_variations(TERM_ID_BE) 
-        assert len(variations) == 2
-        assert TERM_ID_WAS     in variations
-        assert TERM_ID_WERE    in variations
+        assert self.TERMS['were'] in term_ids
 
     def test_lemmatize_present_variation(self):
-        TERM_ID_BE = 10
-        TERM_ID_IS = 14
+        self.lemmatizer.add_term(self.TERMS['is'], self.TERMS['be'])
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_IS, TERM_ID_BE)
+        lemma_id = self.lemmatizer.lemmatize(self.TERMS['is'])
+        assert lemma_id == self.TERMS['be']
 
-        assert lemmatizer.lemmatize(TERM_ID_IS) == TERM_ID_BE
+    def test_lemmatize_absent_term(self):
+        self.lemmatizer.add_term(self.TERMS['is'], self.TERMS['be'])
 
-    def test_lemmatize_absent_variation(self):
-        TERM_ID_BE  = 10
-        TERM_ID_IS  = 14
-        TERM_ID_ARE = 15
+        lemma_id = self.lemmatizer.lemmatize(self.TERMS['are'])
+        assert lemma_id == self.TERMS['are']
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_IS, TERM_ID_BE)
+    def test_get_terms_present_lemma(self):
+        self.lemmatizer.add_term(self.TERMS['set'],     self.TERMS['set'])
+        self.lemmatizer.add_term(self.TERMS['sets'],    self.TERMS['set'])
+        self.lemmatizer.add_term(self.TERMS['setting'], self.TERMS['set'])
 
-        assert lemmatizer.lemmatize(TERM_ID_ARE) == None
+        term_ids = self.lemmatizer.get_terms(self.TERMS['set']) 
+        assert len(term_ids) == 3
 
-    def test_get_variations_present_lemma(self):
-        TERM_ID_SET     = 40
-        TERM_ID_SETS    = 41
-        TERM_ID_SETTING = 42
+        assert self.TERMS['set']     in term_ids
+        assert self.TERMS['sets']    in term_ids
+        assert self.TERMS['setting'] in term_ids
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_SET,     TERM_ID_SET)
-        lemmatizer.set_variation(TERM_ID_SETS,    TERM_ID_SET)
-        lemmatizer.set_variation(TERM_ID_SETTING, TERM_ID_SET)
+    def test_get_term_absent_lemma(self):
+        self.lemmatizer.add_term(self.TERMS['set'],     self.TERMS['set'])
+        self.lemmatizer.add_term(self.TERMS['sets'],    self.TERMS['set'])
+        self.lemmatizer.add_term(self.TERMS['setting'], self.TERMS['set'])
 
-        variations = lemmatizer.get_variations(TERM_ID_SET) 
-        assert len(variations) == 3
-        assert TERM_ID_SET     in variations
-        assert TERM_ID_SETS    in variations
-        assert TERM_ID_SETTING in variations
+        term_ids = self.lemmatizer.get_terms(self.TERMS['be']) 
+        assert len(term_ids) == 0
 
-    def test_get_variations_absent_lemma(self):
-        TERM_ID_BE      = 10
-        TERM_ID_SET     = 40
-        TERM_ID_SETS    = 41
-        TERM_ID_SETTING = 42
+    def test_contains_term_present_term(self):
+        self.lemmatizer.add_term(self.TERMS['has'], self.TERMS['have'])
 
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_SET,     TERM_ID_SET)
-        lemmatizer.set_variation(TERM_ID_SETS,    TERM_ID_SET)
-        lemmatizer.set_variation(TERM_ID_SETTING, TERM_ID_SET)
+        assert self.lemmatizer.contains_term(self.TERMS['has']) == True
 
-        variations = lemmatizer.get_variations(TERM_ID_BE) 
-        assert len(variations) == 0
+    def test_contains_term_absent_term(self):
+        self.lemmatizer.add_term(self.TERMS['has'], self.TERMS['have'])
 
-    def test_contains_variation_present_variation(self):
-        TERM_ID_HAVE = 30
-        TERM_ID_HAS  = 31
-        
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_HAS, TERM_ID_HAVE)
-
-        assert lemmatizer.contains_variation(TERM_ID_HAS) == True
-
-    def test_contains_variation_absent_variation(self):
-        TERM_ID_HAVE = 30
-        TERM_ID_HAS  = 31
-        TERM_ID_HAD  = 32
-        
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_HAS, TERM_ID_HAVE)
-
-        assert lemmatizer.contains_variation(TERM_ID_HAD) == False
+        assert self.lemmatizer.contains_term(self.TERMS['had']) == False
 
     def test_contains_lemma_present_lemma(self):
-        TERM_ID_HAVE = 30
-        TERM_ID_HAS  = 31
-        
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_HAS, TERM_ID_HAVE)
+        self.lemmatizer.add_term(self.TERMS['has'], self.TERMS['have'])
 
-        assert lemmatizer.contains_lemma(TERM_ID_HAVE) == True
+        assert self.lemmatizer.contains_lemma(self.TERMS['have']) == True
 
     def test_contains_lemma_absent_lemma(self):
-        TERM_ID_BE   = 10
-        TERM_ID_HAVE = 30
-        TERM_ID_HAS  = 31
-        
-        lemmatizer = Lemmatizer()
-        lemmatizer.set_variation(TERM_ID_HAS, TERM_ID_HAVE)
+        self.lemmatizer.add_term(self.TERMS['has'], self.TERMS['have'])
 
-        assert lemmatizer.contains_lemma(TERM_ID_BE) == False
+        assert self.lemmatizer.contains_lemma(self.TERMS['be']) == False

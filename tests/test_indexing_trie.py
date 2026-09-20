@@ -466,13 +466,3 @@ class TestTrie:
 
         matches = trie.search('c**t')
         assert matches == ['cat']
-
-    def test_clear(self):
-        trie = Trie()
-        trie.insert('dog')
-        
-        trie.clear()
-
-        assert trie.contains('d')   == False
-        assert trie.contains('do')  == False
-        assert trie.contains('dog') == False

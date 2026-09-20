@@ -1,25 +1,9 @@
-from typing import TypedDict
 from sentencebank.indexing.types import TermID, DocID
+from sqlite3 import Connection
 from dataclasses import dataclass
-from enum import IntEnum
-
-type PostingEntry = list[int]
-type PostingList  = list[PostingEntry]
-type PostingMap   = dict[TermID, PostingList]
 
 
-class IndexData(TypedDict):
-    entries: PostingMap
-
-
-class _EntryAttribute(IntEnum):
-    DOCUMENT_ID  = 0
-    POSITION     = 1
-    START_OFFSET = 2
-    END_OFFSET   = 3
-
-
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Posting:
     doc_id: DocID
     position: int
@@ -28,92 +12,92 @@ class Posting:
 
 
 class InvertedIndex:
-    _data: IndexData
+    _conn: Connection
 
-    def __init__(self) -> None:
-        self._data = {'entries': {}}
+    def __init__(self, connection: Connection) -> None:
+        self._conn = connection
 
-    def term_count(self) -> int:
-        return len(self._data['entries'])
-
-    def clear(self) -> None:
-        self._data['entries'].clear()
-
-    def get_posting(self, term_id: TermID, doc_id: DocID, position: int) -> Posting | None:
-        posting_list = self._data['entries'].get(term_id, None)
-        if posting_list is None:
-            return None
-
-        for posting_entry in posting_list:
-            if posting_entry[_EntryAttribute.DOCUMENT_ID] != doc_id:
-                continue
-            if posting_entry[_EntryAttribute.POSITION] != position:
-                continue
-
-            return Posting(doc_id=posting_entry[_EntryAttribute.DOCUMENT_ID],
-                           position=posting_entry[_EntryAttribute.POSITION],
-                           start=posting_entry[_EntryAttribute.START_OFFSET],
-                           end=posting_entry[_EntryAttribute.END_OFFSET])
-        return None
+    def posting_count(self) -> int:
+        cursor = self._conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM   inverted_index
+                """)
+        row    = cursor.fetchone()
+        return row[0]
 
     def get_postings(self, term_id: TermID) -> list[Posting]:
-        posting_list = self._data['entries'].get(term_id, None)
-        if posting_list is None:
-            return []
+        cursor = self._conn.execute(
+                """
+                SELECT   doc_id, position, start_ofs, end_ofs
+                FROM     inverted_index
+                WHERE    term_id = ?
+                ORDER BY doc_id, position
+                """,
+                (term_id,))
 
         postings: list[Posting] = []
-        for posting_entry in posting_list:
-            posting = Posting(doc_id=posting_entry[_EntryAttribute.DOCUMENT_ID],
-                              position=posting_entry[_EntryAttribute.POSITION],
-                              start=posting_entry[_EntryAttribute.START_OFFSET],
-                              end=posting_entry[_EntryAttribute.END_OFFSET])
+        for row in cursor.fetchall():
+            posting = Posting(doc_id=row[0],
+                              position=row[1],
+                              start=row[2],
+                              end=row[3])
             postings.append(posting)
+        
         return postings
 
-    def remove_posting(self, term_id: TermID, doc_id: DocID, position: int) -> None:
-        posting_list = self._data['entries'].get(term_id, None)
-        if posting_list is None:
-            return
-
-        if len(posting_list) == 1:
-            self._data['entries'].pop(term_id)
-            return
-
-        for posting_entry in posting_list:
-            if posting_entry[_EntryAttribute.DOCUMENT_ID] != doc_id:
-                continue
-            if posting_entry[_EntryAttribute.POSITION] != position:
-                continue
-            posting_list.remove(posting_entry)
-            break
-
     def add_posting(self, term_id: TermID, posting: Posting) -> None:
-        posting_list = self._data['entries'].get(term_id, None)
-        if posting_list is None:
-            posting_list = []
-            self._data['entries'][term_id] = posting_list
+        self._conn.execute(
+                """
+                INSERT
+                INTO   inverted_index
+                       (term_id, doc_id, position, start_ofs, end_ofs)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (term_id, posting.doc_id, posting.position, posting.start, posting.end))
 
-        for posting_entry in posting_list:
-            if posting_entry[_EntryAttribute.DOCUMENT_ID] != posting.doc_id:
-                continue
-            if posting_entry[_EntryAttribute.POSITION] == posting.position:
-                return
+    def remove_posting(self, term_id: TermID, doc_id: DocID, position: int) -> bool:
+        cursor = self._conn.execute(
+                """
+                DELETE
+                FROM   inverted_index
+                WHERE  term_id  = ?
+                AND    doc_id   = ?
+                AND    position = ?
+                """,
+                (term_id, doc_id, position,))
+        return cursor.rowcount > 0
 
-        posting_entry = [posting.doc_id, posting.position, posting.start, posting.end]
-        posting_list.append(posting_entry)
+    def remove_document_postings(self, doc_id: DocID) -> bool:
+        cursor = self._conn.execute(
+                """
+                DELETE
+                FROM   inverted_index
+                WHERE  doc_id = ?
+                """,
+                (doc_id,))
+        return cursor.rowcount > 0
 
     def contains_posting(self, term_id: TermID, doc_id: DocID, position: int) -> bool:
-        posting_list = self._data['entries'].get(term_id, None)
-        if posting_list is None:
-            return False
-
-        for posting_entry in posting_list:
-            if posting_entry[_EntryAttribute.DOCUMENT_ID] != doc_id:
-                continue
-            if posting_entry[_EntryAttribute.POSITION] != position:
-                continue
-            return True
-        return False
+        cursor = self._conn.execute(
+                """
+                SELECT 1
+                FROM   inverted_index
+                WHERE  term_id  = ?
+                AND    doc_id   = ?
+                AND    position = ?
+                LIMIT  1
+                """,
+                (term_id, doc_id, position))
+        return cursor.fetchone() is not None
 
     def contains_term(self, term_id: TermID) -> bool:
-        return term_id in self._data['entries']
+        cursor = self._conn.execute(
+                """
+                SELECT 1
+                FROM   inverted_index 
+                WHERE  term_id = ?
+                LIMIT  1
+                """,
+                (term_id,))
+        return cursor.fetchone() is not None

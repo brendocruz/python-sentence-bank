@@ -1,61 +1,59 @@
-from typing import TypedDict
 from sentencebank.indexing.types import TermID
-
-type VariationMap = dict[TermID, TermID]
-type LemmaMap     = dict[TermID, list[TermID]]
-
-
-class LemmatizerData(TypedDict):
-    variations: VariationMap
-    lemmas:     LemmaMap
+from sqlite3 import Connection
 
 
 class Lemmatizer:
-    _data: LemmatizerData
+    _conn: Connection
 
-    def __init__(self) -> None:
-        self._data = {'variations': {}, 'lemmas': {}}
+    def __init__(self, connection: Connection) -> None:
+        self._conn = connection
     
-    def variation_count(self) -> int:
-        return len(self._data['variations'])
+    def term_count(self) -> int:
+        cursor = self._conn.execute('SELECT COUNT(DISTINCT term_id) FROM lemmas')
+        row    = cursor.fetchone()
+        return row[0]
     
     def lemma_count(self) -> int:
-        return len(self._data['lemmas'])
-
-    def clear(self) -> None:
-        self._data['variations'] = {}
-        self._data['lemmas']     = {}
+        cursor = self._conn.execute('SELECT COUNT(DISTINCT lemma_id) FROM lemmas')
+        row    = cursor.fetchone()
+        return row[0]
     
-    def remove_variation(self, variation_id: TermID) -> None:
-        lemma = self._data['variations'].pop(variation_id, None)
-        if lemma is None:
-            return
+    def remove_term(self, term_id: TermID) -> bool:
+        cursor = self._conn.execute(
+                'DELETE FROM lemmas where term_id = ?',
+                (term_id,))
+        return cursor.rowcount > 0
 
-        lemma_entry = self._data['lemmas'][lemma]
-        lemma_entry.remove(variation_id)
-        if len(lemma_entry) == 0:
-            self._data['lemmas'].pop(lemma)
 
-    def set_variation(self, variation_id: TermID, lemma_id: TermID) -> None:
-        if variation_id in self._data['variations']:
-            self.remove_variation(variation_id)
+    def add_term(self, term_id: TermID, lemma_id: TermID) -> None:
+        self._conn.execute(
+                'INSERT INTO lemmas (term_id, lemma_id) VALUES (?, ?)',
+                (term_id, lemma_id))
 
-        self._data['variations'][variation_id] = lemma_id
+    def lemmatize(self, term_id: TermID) -> TermID:
+        cursor = self._conn.execute(
+                'SELECT lemma_id FROM lemmas WHERE term_id = ?',
+                (term_id,))
+        row    = cursor.fetchone()
 
-        lemma_entry = self._data['lemmas'].get(lemma_id, None)
-        if lemma_entry is None:
-            self._data['lemmas'][lemma_id] = [variation_id]
-            return
-        lemma_entry.append(variation_id)
+        if row is None:
+            return term_id
+        return row[0]
 
-    def lemmatize(self, variation_id: TermID) -> TermID | None:
-        return self._data['variations'].get(variation_id, None)
+    def get_terms(self, lemma_id: TermID) -> list[TermID]:
+        cursor = self._conn.execute(
+                'SELECT term_id FROM lemmas WHERE lemma_id = ?',
+                (lemma_id,))
+        return [row[0] for row in cursor.fetchall()]
 
-    def get_variations(self, lemma_id: TermID) -> list[TermID]:
-        return self._data['lemmas'].get(lemma_id, [])
-
-    def contains_variation(self, variation_id: TermID) -> bool:
-        return variation_id in self._data['variations']
+    def contains_term(self, term_id: TermID) -> bool:
+        cursor = self._conn.execute(
+                'SELECT 1 FROM lemmas WHERE term_id = ? LIMIT 1',
+                (term_id,))
+        return cursor.fetchone() is not None
 
     def contains_lemma(self, lemma_id: TermID) -> bool:
-        return lemma_id in self._data['lemmas']
+        cursor = self._conn.execute(
+                'SELECT 1 FROM lemmas WHERE lemma_id = ? LIMIT 1',
+                (lemma_id,))
+        return cursor.fetchone() is not None

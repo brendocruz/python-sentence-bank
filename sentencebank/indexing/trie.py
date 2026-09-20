@@ -1,13 +1,12 @@
-from enum import IntEnum
-from typing import cast
+class TrieNode:
+    __slots__ = ('is_terminal', 'children')
 
-type TrieChildren = dict[str, 'TrieNode']
-type TrieNode = list[TrieChildren | bool]
+    is_terminal: bool
+    children:    dict[str, 'TrieNode']
 
-
-class _Attribute(IntEnum):
-    TERMINAL = 0
-    CHILDREN = 1
+    def __init__(self, is_terminal: bool = False) -> None:
+        self.is_terminal = is_terminal
+        self.children    = {}
 
 
 class Trie:
@@ -16,16 +15,12 @@ class Trie:
     WILDCARD_SINGLE = '?'
     WILDCARD_MULTI  = '*'
 
-    def __init__(self, root: TrieNode | None = None) -> None:
-        self._root = root or self._create_root()
-
-    def _create_root(self) -> TrieNode:
-        root = [False, {}]
-        return root
+    def __init__(self) -> None:
+        self._root = TrieNode()
 
     def _create_node(self, parent: TrieNode, key: str, is_terminal: bool) -> None:
-        new_node: TrieNode = [is_terminal, {}]
-        children = cast(TrieChildren, parent[_Attribute.CHILDREN])
+        new_node = TrieNode(is_terminal)
+        children = parent.children
         children[key] = new_node
 
     def insert(self, term: str) -> bool:
@@ -36,15 +31,15 @@ class Trie:
         current         = self._root
         last_char_index = len(term) - 1
         for index, char in enumerate(term):
-            children    = cast(TrieChildren, current[_Attribute.CHILDREN])
+            children    = current.children
             is_terminal = index == last_char_index
             if char not in children:
                 is_new = True
                 self._create_node(current, char, is_terminal)
             current = children[char]
             if is_terminal:
-                is_new = is_new or current[_Attribute.TERMINAL] == False
-                current[_Attribute.TERMINAL] = True
+                is_new = is_new or current.is_terminal == False
+                current.is_terminal = True
         return is_new
 
     def contains(self, term: str) -> bool:
@@ -54,13 +49,13 @@ class Trie:
         current         = self._root
         last_char_index = len(term) - 1
         for index, char in enumerate(term):
-            children = cast(TrieChildren, current[_Attribute.CHILDREN])
+            children = current.children
             if char not in children:
                 return False
             current  = children[char]
             if index != last_char_index:
                 continue
-            if current[_Attribute.TERMINAL]:
+            if current.is_terminal:
                 return True
             break
         return False
@@ -74,40 +69,40 @@ class Trie:
         last_fork       = current
         key_to_prune    = term[0]
         for index, char in enumerate(term):
-            children = cast(TrieChildren, current[_Attribute.CHILDREN])
+            children = current.children
             if char not in children:
                 return False
 
-            if current[_Attribute.TERMINAL] or len(children) > 1:
+            if current.is_terminal or len(children) > 1:
                 last_fork    = current
                 key_to_prune = char
             current = children[char]
 
             if index < last_char_index:
                 continue
-            if not current[_Attribute.TERMINAL]:
+            if not current.is_terminal:
                 return False
-            current[_Attribute.TERMINAL] = False
+            current.is_terminal = False
 
-        children = cast(TrieChildren, current[_Attribute.CHILDREN])
+        children = current.children
         if len(children) > 0:
             last_fork = None
 
         if last_fork is None:
             return True
 
-        fork_children = cast(TrieChildren, last_fork[_Attribute.CHILDREN])
+        fork_children = last_fork.children
         fork_children.pop(key_to_prune)
         return True
 
     def _search_node(self, node: TrieNode, pattern: str, path: str) -> list[str]:
-        terminal = cast(bool, node[_Attribute.TERMINAL])
+        terminal = node.is_terminal
         if pattern == '':
             if not terminal:
                 return []
             return [path]
 
-        children = cast(TrieChildren, node[_Attribute.CHILDREN])
+        children = node.children
         char     = pattern[0]
 
         if char == '?':
@@ -139,6 +134,3 @@ class Trie:
 
         matches = self._search_node(self._root, pattern, '')
         return sorted(set(matches))
-
-    def clear(self) -> None:
-        self._root[_Attribute.CHILDREN] = {}
