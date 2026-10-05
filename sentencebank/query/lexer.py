@@ -1,5 +1,6 @@
-from sentencebank.query.tokens import QueryToken, QueryTokenKind
 import unicodedata
+
+from sentencebank.query.tokens import QueryToken, QueryTokenKind
 
 
 class QueryLexer:
@@ -118,7 +119,7 @@ class QueryLexer:
 
         kind: QueryTokenKind
         if has_wildcard:
-            kind = QueryTokenKind.WTERM
+            kind = QueryTokenKind.PATTERN
         elif has_separator:
             kind = QueryTokenKind.TERM
         elif not has_non_digit:
@@ -136,7 +137,7 @@ class QueryLexer:
             end = self._cursor
             return QueryToken(kind=QueryTokenKind.PRECEDES, value='<<', start=start, end=end)
         end = self._cursor
-        return QueryToken(kind=QueryTokenKind.ANGLE_OPEN, value='<', start=start, end=end)
+        return QueryToken(kind=QueryTokenKind.LANGLE, value='<', start=start, end=end)
 
     def _read_symbol(self) -> QueryToken:
         char = self._peek()
@@ -164,7 +165,7 @@ class QueryLexer:
         elif char == ':':
             kind = QueryTokenKind.COLON
         elif char == '>':
-            kind = QueryTokenKind.ANGLE_CLOSE
+            kind = QueryTokenKind.RANGLE
         elif char == '^':
             kind = QueryTokenKind.CARET
         else:

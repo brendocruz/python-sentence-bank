@@ -1,18 +1,25 @@
+from pytest import fixture
+
 from sentencebank.query.filters import CaseFoldingFilter, ProtectedTermsFilter
-from sentencebank.query.tokens import QueryToken, QueryTokenKind
+from sentencebank.query.tokens import QueryTokenKind
+from tests.support.builders.query_token import QueryTokenTestBuilder
 
 
 class TestQueryCaseFoldingFilter:
+    _builder: QueryTokenTestBuilder
 
-    def test_process_empty_token_list(self):
+    @fixture(autouse=True)
+    def setup(self):
+        self._builder = QueryTokenTestBuilder()
+
+    def test_process_when_token_list_is_empty(self):
         tokens = []
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
         assert len(result) == 0
 
-    def test_process_eof(self):
-        token1 = QueryToken(kind=QueryTokenKind.EOF,  value='', start=0, end=0)
-        tokens = [token1]
+    def test_process_when_token_is_eof(self):
+        tokens = self._builder.many().eof(0).build()
 
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
@@ -23,10 +30,8 @@ class TestQueryCaseFoldingFilter:
         assert result[0].start == 0
         assert result[0].end   == 0
 
-    def test_process_term(self):
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='PaRaDiGm', start=0, end=8)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',         start=8, end=8)
-        tokens = [token1, token2]
+    def test_process_when_token_is_a_term(self):
+        tokens = self._builder.many().term('PaRaDiGm', 0, 8).eof(8).build()
 
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
@@ -42,17 +47,15 @@ class TestQueryCaseFoldingFilter:
         assert result[1].start == 8
         assert result[1].end   == 8
 
-    def test_process_wterm(self):
-        token1 = QueryToken(kind=QueryTokenKind.WTERM, value='T??En', start=0, end=5)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,   value='',      start=5, end=5)
-        tokens = [token1, token2]
+    def test_process_when_token_is_a_pattern(self):
+        tokens = self._builder.many().pattern('T??En', 0, 5).eof(5).build()
 
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
         assert len(result) == 2
 
         assert result[0].value == 't??en'
-        assert result[0].kind  == QueryTokenKind.WTERM
+        assert result[0].kind  == QueryTokenKind.PATTERN
         assert result[0].start == 0
         assert result[0].end   == 5
 
@@ -61,10 +64,8 @@ class TestQueryCaseFoldingFilter:
         assert result[1].start == 5
         assert result[1].end   == 5
 
-    def test_process_number(self):
-        token1 = QueryToken(kind=QueryTokenKind.NUMBER, value='100', start=0, end=3)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,    value='',    start=3, end=3)
-        tokens = [token1, token2]
+    def test_process_when_token_is_a_number(self):
+        tokens = self._builder.many().number('100', 0, 3).eof(3).build()
 
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
@@ -80,10 +81,8 @@ class TestQueryCaseFoldingFilter:
         assert result[1].start == 3
         assert result[1].end   == 3
 
-    def test_process_symbol(self):
-        token1 = QueryToken(kind=QueryTokenKind.PRECEDES, value='<<', start=0, end=2)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,      value='',   start=2, end=2)
-        tokens = [token1, token2]
+    def test_process_when_token_is_a_symbol(self):
+        tokens = self._builder.many().precedes(0).eof(2).build()
 
         filter = CaseFoldingFilter()
         result = filter.process(tokens)
@@ -101,8 +100,13 @@ class TestQueryCaseFoldingFilter:
 
 
 class TestQueryProtectedTermsFilter:
+    builder: QueryTokenTestBuilder
 
-    def test_process_empty_token_list(self):
+    @fixture(autouse=True)
+    def setup(self):
+        self.builder = QueryTokenTestBuilder()
+
+    def test_process_when_token_list_is_empty(self):
         query  = ''
         tokens = []
 
@@ -111,10 +115,9 @@ class TestQueryProtectedTermsFilter:
         result = filter.process(tokens, query)
         assert len(result) == 0
 
-    def test_process_empty_query(self):
+    def test_process_when_query_is_empty(self):
         query  = ''
-        token1 = QueryToken(kind=QueryTokenKind.EOF, value='', start=1, end=1)
-        tokens = [token1]
+        tokens = self.builder.many().eof(0).build()
 
         terms  = ['Dr.', 'etc.']
         filter = ProtectedTermsFilter(terms)
@@ -123,14 +126,12 @@ class TestQueryProtectedTermsFilter:
 
         assert result[0].value == ''
         assert result[0].kind  == QueryTokenKind.EOF
-        assert result[0].start == 1
-        assert result[0].end   == 1
+        assert result[0].start == 0
+        assert result[0].end   == 0
 
-    def test_process_wterm(self):
+    def test_process_when_token_is_a_pattern(self):
         query  = 'd?g'
-        token1 = QueryToken(kind=QueryTokenKind.WTERM, value='d?g', start=0, end=3)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,   value='',    start=3, end=3)
-        tokens = [token1, token2]
+        tokens = self.builder.many().pattern('d?g', 0, 3).eof(3).build()
 
         terms  = ['etc.']
         filter = ProtectedTermsFilter(terms)
@@ -138,7 +139,7 @@ class TestQueryProtectedTermsFilter:
         assert len(result) == 2
 
         assert result[0].value == 'd?g'
-        assert result[0].kind  == QueryTokenKind.WTERM
+        assert result[0].kind  == QueryTokenKind.PATTERN
         assert result[0].start == 0
         assert result[0].end   == 3
 
@@ -147,11 +148,9 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 3
         assert result[1].end   == 3
 
-    def test_process_term_not_in_the_list(self):
+    def test_process_when_term_is_not_in_the_list(self):
         query  = 'e.g.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='e.g', start=0, end=3)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',    start=4, end=4)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('e.g', 0, 3).eof(3).build()
 
         terms  = ['etc.']
         filter = ProtectedTermsFilter(terms)
@@ -165,14 +164,12 @@ class TestQueryProtectedTermsFilter:
 
         assert result[1].value == ''
         assert result[1].kind  == QueryTokenKind.EOF
-        assert result[1].start == 4
-        assert result[1].end   == 4
+        assert result[1].start == 3
+        assert result[1].end   == 3
 
-    def test_process_term_embedded_in_longer_word(self):
+    def test_process_with_term_embedded_in_longer_word(self):
         query  = 'L\'hôpital'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='l\'hôpital', start=0, end=9)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',           start=9, end=9)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('l\'hôpital', 0, 9).eof(9).build()
 
         terms  = ['l\'']
         filter = ProtectedTermsFilter(terms)
@@ -189,11 +186,9 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 9
         assert result[1].end   == 9
 
-    def test_process_term_with_trailing_non_word_char(self):
+    def test_process_with_term_with_trailing_non_word_char(self):
         query  = 'Dr.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='dr', start=0, end=2)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',   start=3, end=3)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('dr', 0, 2).eof(3).build()
 
         terms  = ['Dr.']
         filter = ProtectedTermsFilter(terms)
@@ -210,12 +205,12 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 3
         assert result[1].end   == 3
 
-    def test_process_terms_with_trailing_non_word_char(self):
+    def test_process_with_terms_with_trailing_non_word_char(self):
         query  = 'Dr. Dra.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='dr',  start=0, end=2)
-        token2 = QueryToken(kind=QueryTokenKind.TERM, value='dra', start=4, end=7)
-        token3 = QueryToken(kind=QueryTokenKind.EOF,  value='',    start=8, end=8)
-        tokens = [token1, token2, token3]
+        tokens = (self.builder.many()
+                  .term('dr', 0, 2)
+                  .term('dra', 4, 7)
+                  .eof(8).build())
 
         terms  = ['Dr.', 'Dra.']
         filter = ProtectedTermsFilter(terms)
@@ -237,11 +232,9 @@ class TestQueryProtectedTermsFilter:
         assert result[2].start == 8
         assert result[2].end   == 8
 
-    def test_process_term_with_leading_non_word_char(self):
+    def test_process_with_term_with_leading_non_word_char(self):
         query  = '\'cause'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='cause', start=1, end=6)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',      start=6, end=6)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('cause', 1, 6).eof(6).build()
 
         terms  = ['\'cause']
         filter = ProtectedTermsFilter(terms)
@@ -258,13 +251,13 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 6
         assert result[1].end   == 6
 
-    def test_process_term_with_leading_and_trailing_non_word_char(self):
+    def test_process_with_term_with_leading_and_trailing_non_word_char(self):
         query  = 'rock \'n\' roll'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='rock', start=0, end=4)
-        token2 = QueryToken(kind=QueryTokenKind.TERM, value='n',    start=6, end=7)
-        token3 = QueryToken(kind=QueryTokenKind.TERM, value='roll', start=9, end=13)
-        token4 = QueryToken(kind=QueryTokenKind.EOF,  value='',     start=13, end=13)
-        tokens = [token1, token2, token3, token4]
+        tokens = (self.builder.many()
+                  .term('rock', 0, 4)
+                  .term('n', 6, 7)
+                  .term('roll', 9, 13)
+                  .eof(13).build())
 
         terms  = ['\'n\'']
         filter = ProtectedTermsFilter(terms)
@@ -291,12 +284,9 @@ class TestQueryProtectedTermsFilter:
         assert result[3].start == 13
         assert result[3].end   == 13
 
-    def test_process_term_with_multiple_inner_non_word_char(self):
+    def test_process_with_term_with_multiple_inner_non_word_char(self):
         query  = 'rock-\'n\'-roll'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='rock-\'n\'-roll',
-                            start=0, end=13)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='', start=13, end=13)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('rock-\'n\'-roll', 0, 13).eof(13).build()
 
         terms  = ['\'n\'']
         filter = ProtectedTermsFilter(terms)
@@ -313,11 +303,9 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 13
         assert result[1].end   == 13
 
-    def test_process_term_overlapping_matches_longer(self):
+    def test_process_with_terms_overlapping_targeting_the_longer_term(self):
         query  = 'U.S.A.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='u.s.a', start=0, end=5)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',      start=6, end=6)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('u.s.a', 0, 5).eof(6).build()
 
         terms  = ['U.S.', 'U.S.A.']
         filter = ProtectedTermsFilter(terms)
@@ -334,11 +322,9 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 6
         assert result[1].end   == 6
 
-    def test_process_term_overlapping_matches_shorter(self):
+    def test_process_with_terms_overlapping_targeting_the_shorter_term(self):
         query  = 'U.S.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='u.s', start=0, end=3)
-        token2 = QueryToken(kind=QueryTokenKind.EOF,  value='',    start=4, end=4)
-        tokens = [token1, token2]
+        tokens = self.builder.many().term('u.s', 0, 3).eof(4).build()
 
         terms  = ['U.S.', 'U.S.A.']
         filter = ProtectedTermsFilter(terms)
@@ -355,12 +341,12 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 4
         assert result[1].end   == 4
 
-    def test_process_term_with_inner_whitespace_char(self):
+    def test_process_with_term_with_inner_whitespace_char(self):
         query  = 'et al.'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='et', start=0, end=2)
-        token2 = QueryToken(kind=QueryTokenKind.TERM, value='al', start=3, end=5)
-        token3 = QueryToken(kind=QueryTokenKind.EOF,  value='',   start=6, end=6)
-        tokens = [token1, token2, token3]
+        tokens = (self.builder.many()
+                  .term('et', 0, 2)
+                  .term('al', 3, 5)
+                  .eof(6).build())
 
         terms  = ['et al.']
         filter = ProtectedTermsFilter(terms)
@@ -377,12 +363,12 @@ class TestQueryProtectedTermsFilter:
         assert result[1].start == 6
         assert result[1].end   == 6
 
-    def test_process_term_with_repeated_pattern(self):
+    def test_process_with_term_with_repeated_pattern(self):
         query  = 'bye bye'
-        token1 = QueryToken(kind=QueryTokenKind.TERM, value='bye', start=0, end=3)
-        token2 = QueryToken(kind=QueryTokenKind.TERM, value='bye', start=4, end=7)
-        token3 = QueryToken(kind=QueryTokenKind.EOF,  value='',    start=7, end=7)
-        tokens = [token1, token2, token3]
+        tokens = (self.builder.many()
+                  .term('bye', 0, 3)
+                  .term('bye', 4, 7)
+                  .eof(7).build())
 
         terms  = ['bye bye']
         filter = ProtectedTermsFilter(terms)

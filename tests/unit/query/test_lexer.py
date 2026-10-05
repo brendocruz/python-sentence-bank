@@ -9,7 +9,7 @@ class TestQueryLexer:
         separators = '-,.\''
         self.lexer = QueryLexer(separators)
 
-    def test_tokenize_empty(self):
+    def test_tokenize_when_tokenizer_is_empty(self):
         tokens = self.lexer.tokenize('')
         assert len(tokens) == 1
 
@@ -18,7 +18,7 @@ class TestQueryLexer:
         assert tokens[0].start == 0
         assert tokens[0].end   == 0
 
-    def test_tokenize_dollar(self):
+    def test_tokenize_with_dollar_symbol(self):
         tokens = self.lexer.tokenize('$')
         assert len(tokens) == 2
 
@@ -32,7 +32,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_caret(self):
+    def test_tokenize_with_caret_symbol(self):
         tokens = self.lexer.tokenize('^')
         assert len(tokens) == 2
 
@@ -46,7 +46,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_not(self):
+    def test_tokenize_with_not_symbol(self):
         tokens = self.lexer.tokenize('~')
         assert len(tokens) == 2
 
@@ -60,7 +60,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_exact(self):
+    def test_tokenize_with_exact_symbol(self):
         tokens = self.lexer.tokenize('=')
         assert len(tokens) == 2
 
@@ -74,7 +74,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_and(self):
+    def test_tokenize_with_and_symbol(self):
         tokens = self.lexer.tokenize('&')
         assert len(tokens) == 2
 
@@ -88,7 +88,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_or(self):
+    def test_tokenize_with_or_symbol(self):
         tokens = self.lexer.tokenize('|')
         assert len(tokens) == 2
 
@@ -102,7 +102,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_lparen(self):
+    def test_tokenize_with_lparen_symbol(self):
         tokens = self.lexer.tokenize('(')
         assert len(tokens) == 2
 
@@ -116,7 +116,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_rparen(self):
+    def test_tokenize_with_rparen_symbol(self):
         tokens = self.lexer.tokenize(')')
         assert len(tokens) == 2
 
@@ -130,7 +130,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_quote(self):
+    def test_tokenize_with_quote_symbol(self):
         tokens = self.lexer.tokenize('"')
         assert len(tokens) == 2
 
@@ -144,7 +144,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_colon(self):
+    def test_tokenize_with_colon_symbol(self):
         tokens = self.lexer.tokenize(':')
         assert len(tokens) == 2
 
@@ -158,11 +158,11 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_angle_open(self):
+    def test_tokenize_with_open_angle_symbol(self):
         tokens = self.lexer.tokenize('<')
         assert len(tokens) == 2
 
-        assert tokens[0].kind  == QueryTokenKind.ANGLE_OPEN
+        assert tokens[0].kind  == QueryTokenKind.LANGLE
         assert tokens[0].value == '<'
         assert tokens[0].start == 0
         assert tokens[0].end   == 1
@@ -172,7 +172,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_precedes(self):
+    def test_tokenize_with_precedes_symbol(self):
         tokens = self.lexer.tokenize('<<')
         assert len(tokens) == 2
 
@@ -186,11 +186,11 @@ class TestQueryLexer:
         assert tokens[1].start == 2
         assert tokens[1].end   == 2
 
-    def test_tokenize_angle_close(self):
+    def test_tokenize_with_close_angle(self):
         tokens = self.lexer.tokenize('>')
         assert len(tokens) == 2
 
-        assert tokens[0].kind  == QueryTokenKind.ANGLE_CLOSE
+        assert tokens[0].kind  == QueryTokenKind.RANGLE
         assert tokens[0].value == '>'
         assert tokens[0].start == 0
         assert tokens[0].end   == 1
@@ -200,7 +200,7 @@ class TestQueryLexer:
         assert tokens[1].start == 1
         assert tokens[1].end   == 1
 
-    def test_tokenize_number(self):
+    def test_tokenize_with_number(self):
         tokens = self.lexer.tokenize('67')
         assert len(tokens) == 2
 
@@ -214,7 +214,7 @@ class TestQueryLexer:
         assert tokens[1].start == 2
         assert tokens[1].end   == 2
 
-    def test_tokenize_term_with_digit_in_the_end(self):
+    def test_tokenize_with_term_with_digit_in_the_end(self):
         tokens = self.lexer.tokenize('Web3')
         assert len(tokens) == 2
 
@@ -228,7 +228,7 @@ class TestQueryLexer:
         assert tokens[1].start == 4
         assert tokens[1].end   == 4
 
-    def test_tokenize_term_with_digit_in_the_beginning(self):
+    def test_tokenize_with_term_with_digit_in_the_beginning(self):
         tokens = self.lexer.tokenize('5G')
         assert len(tokens) == 2
 
@@ -242,7 +242,7 @@ class TestQueryLexer:
         assert tokens[1].start == 2
         assert tokens[1].end   == 2
 
-    def test_tokenize_term_with_digit_in_the_middle(self):
+    def test_tokenize_with_term_with_digit_in_the_middle(self):
         tokens = self.lexer.tokenize('Y2K')
         assert len(tokens) == 2
 
@@ -256,7 +256,7 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_term_no_wildcard(self):
+    def test_tokenize_with_single_term(self):
         tokens = self.lexer.tokenize('cat')
         assert len(tokens) == 2
 
@@ -270,11 +270,11 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_wterm_with_asterisk(self):
+    def test_tokenize_with_pattern_with_asterisk_wildcard(self):
         tokens = self.lexer.tokenize('c*t')
         assert len(tokens) == 2
 
-        assert tokens[0].kind  == QueryTokenKind.WTERM
+        assert tokens[0].kind  == QueryTokenKind.PATTERN
         assert tokens[0].value == 'c*t'
         assert tokens[0].start == 0
         assert tokens[0].end   == 3
@@ -284,11 +284,11 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_wterm_question_mark(self):
+    def test_tokenize_with_pattern_with_question_mark_wildcard(self):
         tokens = self.lexer.tokenize('c?t')
         assert len(tokens) == 2
 
-        assert tokens[0].kind  == QueryTokenKind.WTERM
+        assert tokens[0].kind  == QueryTokenKind.PATTERN
         assert tokens[0].value == 'c?t'
         assert tokens[0].start == 0
         assert tokens[0].end   == 3
@@ -298,11 +298,11 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_term_with_wildcard_and_digit(self):
+    def test_tokenize_with_pattern_with_digit(self):
         tokens = self.lexer.tokenize('?2K')
         assert len(tokens) == 2
 
-        assert tokens[0].kind  == QueryTokenKind.WTERM
+        assert tokens[0].kind  == QueryTokenKind.PATTERN
         assert tokens[0].value == '?2K'
         assert tokens[0].start == 0
         assert tokens[0].end   == 3
@@ -312,7 +312,7 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_term_multiple_words(self):
+    def test_tokenize_with_multiple_terms(self):
         tokens = self.lexer.tokenize('cat dog fish')
         assert len(tokens) == 4
 
@@ -336,7 +336,7 @@ class TestQueryLexer:
         assert tokens[3].start == 12
         assert tokens[3].end   == 12
 
-    def test_tokenize_handle_whitespace(self):
+    def test_tokenize_handles_whitespace(self):
         tokens = self.lexer.tokenize('|   \t\t\t &   \n\n\n =')
         assert len(tokens) == 4
 
@@ -360,7 +360,7 @@ class TestQueryLexer:
         assert tokens[3].start == 17
         assert tokens[3].end   == 17
 
-    def test_tokenize_term_number_with_separators(self):
+    def test_tokenize_with_number_with_separators(self):
         tokens = self.lexer.tokenize('100.000.000')
         assert len(tokens) == 2
 
@@ -374,7 +374,7 @@ class TestQueryLexer:
         assert tokens[1].start == 11
         assert tokens[1].end   == 11
 
-    def test_tokenize_term_number_start_with_separator(self):
+    def test_tokenize_with_number_starting_with_separator(self):
         tokens = self.lexer.tokenize('.5')
         assert len(tokens) == 2
 
@@ -388,7 +388,7 @@ class TestQueryLexer:
         assert tokens[1].start == 2
         assert tokens[1].end   == 2
     
-    def test_tokenize_term_with_separator(self):
+    def test_tokenize_with_term_with_separator(self):
         tokens = self.lexer.tokenize('self-esteem')
         assert len(tokens) == 2
 
@@ -402,7 +402,7 @@ class TestQueryLexer:
         assert tokens[1].start == 11
         assert tokens[1].end   == 11
 
-    def test_tokenize_term_with_single_trailing_separator(self):
+    def test_tokenize_with_term_with_single_trailing_separator(self):
         tokens = self.lexer.tokenize('Dr.')
         assert len(tokens) == 2
 
@@ -416,7 +416,7 @@ class TestQueryLexer:
         assert tokens[1].start == 3
         assert tokens[1].end   == 3
 
-    def test_tokenize_term_with_multiple_trailing_separators(self):
+    def test_tokenize_with_term_with_multiple_trailing_separators(self):
         tokens = self.lexer.tokenize('Hello...')
         assert len(tokens) == 2
 
@@ -430,7 +430,7 @@ class TestQueryLexer:
         assert tokens[1].start == 8
         assert tokens[1].end   == 8
 
-    def test_tokenize_term_with_single_leading_separator(self):
+    def test_tokenize_with_term_with_single_leading_separator(self):
         tokens = self.lexer.tokenize('\'n')
         assert len(tokens) == 2
 
@@ -444,7 +444,7 @@ class TestQueryLexer:
         assert tokens[1].start == 2
         assert tokens[1].end   == 2
 
-    def test_tokenize_term_with_multiple_leading_separator(self):
+    def test_tokenize_with_term_with_multiple_leading_separator(self):
         tokens = self.lexer.tokenize('...World')
         assert len(tokens) == 2
 
@@ -458,7 +458,7 @@ class TestQueryLexer:
         assert tokens[1].start == 8
         assert tokens[1].end   == 8
 
-    def test_tokenize_term_with_multiple_separators(self):
+    def test_tokenize_with_term_with_multiple_separators(self):
         tokens = self.lexer.tokenize('rock-\'n\'-roll')
         assert len(tokens) == 2
 

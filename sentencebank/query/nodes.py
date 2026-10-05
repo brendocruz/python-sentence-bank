@@ -1,5 +1,6 @@
-from sentencebank.query.tokens import QueryToken, QueryTokenKind
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from sentencebank.indexing.types import TermID
 
 
 @dataclass
@@ -7,17 +8,22 @@ class QueryNode:
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class TermNode(QueryNode):
-    token: QueryToken
+    value:             str
+    is_exact:          bool        = False
+    resolved_term_ids: set[TermID] = field(default_factory=set)
 
-    def is_wildcard(self) -> bool:
-        return self.token.kind == QueryTokenKind.WTERM
+ 
+@dataclass(slots=True)
+class PatternNode(QueryNode):
+    value:             str
+    resolved_term_ids: set[TermID] = field(default_factory=set)
 
 
 @dataclass
 class PhraseNode(QueryNode):
-    children: list[TermNode]
+    children: list[QueryNode]
 
 
 @dataclass
@@ -32,11 +38,6 @@ class EndsWithNode(QueryNode):
 
 @dataclass
 class NotNode(QueryNode):
-    child: QueryNode
-
-
-@dataclass
-class ExactNode(QueryNode):
     child: QueryNode
 
 

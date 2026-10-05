@@ -1,5 +1,6 @@
-from sentencebank.indexing.types import DocID
 from sqlite3 import Connection
+
+from sentencebank.indexing.types import DocID
 
 
 class DocumentStore:
@@ -8,10 +9,14 @@ class DocumentStore:
     def __init__(self, connection: Connection) -> None:
         self._conn = connection
 
-    def add_document(self, text: str) -> DocID:
+    def add_document(self, document: str) -> DocID:
+        if not document:
+            message = 'Document must not be an empty string'
+            raise ValueError(message)
+
         cursor = self._conn.execute(
                 'INSERT INTO documents (text) VALUES (?)',
-                (text,))
+                (document,))
         assert cursor.lastrowid
         return cursor.lastrowid
 

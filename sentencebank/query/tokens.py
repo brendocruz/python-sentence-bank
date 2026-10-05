@@ -4,12 +4,12 @@ from enum import Enum, auto
 
 class QueryTokenKind(Enum):
     TERM        = auto() # `cat`, `dog`, `apple`.
-    WTERM       = auto() # `*tion`, `post*`, `post*tion`
+    PATTERN     = auto() # `*tion`, `post*`, `post*tion`
     NUMBER      = auto() # 6, 7, 12.
 
     PRECEDES    = auto() # `<<`.
-    ANGLE_OPEN  = auto() # `<`.
-    ANGLE_CLOSE = auto() # `>`.
+    LANGLE      = auto() # `<`.
+    RANGLE      = auto() # `>`.
     COLON       = auto() # `:`.
 
     AND         = auto() # `&`.

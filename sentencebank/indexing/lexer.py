@@ -1,5 +1,6 @@
-from sentencebank.indexing.tokens import IndexingToken
 import unicodedata
+
+from sentencebank.indexing.tokens import IndexingToken
 
 
 class IndexingLexer:

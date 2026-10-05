@@ -1,12 +1,13 @@
-from sentencebank.query.tokens import QueryToken, QueryTokenKind
 import unicodedata
+
+from sentencebank.query.tokens import QueryToken, QueryTokenKind
 
 
 class CaseFoldingFilter:
 
     def process(self, tokens: list[QueryToken]) -> list[QueryToken]:
         for token in tokens:
-            if token.kind != QueryTokenKind.TERM and token.kind != QueryTokenKind.WTERM:
+            if token.kind != QueryTokenKind.TERM and token.kind != QueryTokenKind.PATTERN:
                 continue
             normalized  = unicodedata.normalize('NFC', token.value).casefold()
             token.value = normalized

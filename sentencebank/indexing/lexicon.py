@@ -9,6 +9,9 @@ class Lexicon:
         self._conn = connection
 
     def contains(self, term: str) -> bool:
+        if not term:
+            return False
+
         cursor = self._conn.execute(
                 """
                 SELECT 1
@@ -34,6 +37,9 @@ class Lexicon:
         return row[0]
 
     def get_term_id(self, term: str) -> TermID | None:
+        if not term:
+            return None
+
         cursor = self._conn.execute(
                 """
                 SELECT term_id
@@ -46,6 +52,37 @@ class Lexicon:
         if row is None:
             return None
         return row[0]
+
+    def get_term_ids(self, terms: list[str]) -> list[TermID]:
+        if not terms:
+            return []
+
+        self._conn.execute(
+                """
+                CREATE TEMP TABLE IF NOT EXISTS temp_terms (
+                    term TEXT PRIMARY KEY
+                )
+                """)
+        self._conn.execute(
+                """
+                DELETE FROM temp_terms
+                """)
+
+        self._conn.executemany(
+                """
+                INSERT OR IGNORE
+                INTO   temp_terms (term)
+                VALUES (?)
+                """, [(term,) for term in terms])
+
+        cursor = self._conn.execute(
+                """
+                SELECT l.term_id
+                FROM   lexicon AS l
+                JOIN   temp_terms as t
+                ON     l.term = t.term
+                """)
+        return [row[0] for row in cursor.fetchall()]
 
     def get_doc_freq(self, term_id: int) -> int:
         cursor = self._conn.execute(
@@ -96,9 +133,13 @@ class Lexicon:
         return row[0]
 
     def add_term(self, term: str, is_protected: bool = False) -> TermID:
+        if not term:
+            message = '`term` must not be an empty string'
+            raise ValueError(message)
+        
         cursor = self._conn.execute(
                 """
-                INSERT
+                INSERT OR IGNORE
                 INTO   lexicon (term, doc_freq, col_freq, is_protected)
                 VALUES (?, 0, 0, ?)
                 """,
@@ -155,4 +196,14 @@ class Lexicon:
         if row is None:
             return False
         return bool(row[0])
+
+    def purge_unused_terms(self) -> list[str]:
+        cursor = self._conn.execute(
+                """
+                DELETE
+                FROM   lexicon
+                WHERE  doc_freq == 0 AND is_protected = FALSE
+                RETURNING term
+                """)
+        return [row[0] for row in cursor.fetchall()]
 

@@ -1,17 +1,29 @@
-from sentencebank.indexing.tokens import IndexingToken
 import unicodedata
+from abc import ABC, abstractmethod
+
+from sentencebank.indexing.tokens import IndexingToken
 
 
-class CaseFoldingFilter:
+class IndexingFilter(ABC):
 
-    def process(self, tokens: list[IndexingToken]) -> list[IndexingToken]:
+    @abstractmethod
+    def process(self, tokens: list[IndexingToken], document: str) -> list[IndexingToken]:
+        ...
+
+
+class IndexingCaseFoldingFilter(IndexingFilter):
+
+    def process(self, tokens: list[IndexingToken], document: str = '') -> list[IndexingToken]:
+        if document == '':
+            return []
+
         for token in tokens:
             normalized  = unicodedata.normalize('NFC', token.value).casefold()
             token.value = normalized
         return tokens
 
 
-class ProtectedTermsFilter:
+class IndexingProtectedTermsFilter(IndexingFilter):
     _terms:        list[str]
     _tokens:       list[IndexingToken]
     _document:     str
@@ -77,8 +89,11 @@ class ProtectedTermsFilter:
 
         return '', 0, 0
 
-    def process(self, tokens: list[IndexingToken], query: str) -> list[IndexingToken]:
-        self._reset(tokens, query)
+    def process(self, tokens: list[IndexingToken], document: str) -> list[IndexingToken]:
+        if document == '':
+            return []
+
+        self._reset(tokens, document)
         result: list[IndexingToken] = []
 
         offset = 0
